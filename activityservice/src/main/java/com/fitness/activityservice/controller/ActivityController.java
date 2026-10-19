@@ -24,7 +24,7 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class ActivityController {
 
-        private  ActivityService activityService;
+        private final ActivityService activityService;
         @PostMapping
         public ResponseEntity<ActivityResponse> trackActivity (@Valid @RequestBody ActivityRequest request) {
             return ResponseEntity.ok(activityService.trackActivity(request));
