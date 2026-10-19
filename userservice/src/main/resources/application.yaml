@@ -2,7 +2,7 @@ server:
     port: 8081
 spring:
     application:
-        name: userservice
+        name: user-service
     datasource:
         url:  jdbc:postgresql://localhost:5432/fitness_user_db
         username: postgres
@@ -11,3 +11,11 @@ spring:
         hibernate:
             ddl-auto: update
         database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+eureka:
+    instance:
+        instance-id: ${spring.application.name}:${server.port}
+        non-secure-port: ${server.port}
+    client:
+        service-url:
+            defaultZone: http://localhost:8761/eureka/

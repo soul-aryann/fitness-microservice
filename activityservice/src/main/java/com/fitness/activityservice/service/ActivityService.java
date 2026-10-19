@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 
 import com.fitness.activityservice.dto.ActivityRequest;
 import com.fitness.activityservice.dto.ActivityResponse;
+import com.fitness.activityservice.exception.ActivityNotFoundException;
+import com.fitness.activityservice.exception.UserValidationException;
 import com.fitness.activityservice.model.Activity;
 import com.fitness.activityservice.repository.ActivityRepository;
 
@@ -16,13 +18,20 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ActivityService {
     private final ActivityRepository activityRepository;
+    private final UserValidationService userValidationService;
     public ActivityResponse trackActivity(ActivityRequest request){
+
+       boolean isValidUser = userValidationService.validateUser(request.getUserId());
+       if(!isValidUser){
+        throw new UserValidationException("Invalid user: " + request.getUserId());
+       }
+
         Activity activity = Activity.builder()
                 .userId(request.getUserId())
                 .type(request.getType())
                 .duration(request.getDuration())
                 .caloriesBurned(request.getCaloriesBurned())
-                .starTime(request.getStarTime())
+                .startTime(request.getStartTime())
                 .additionalMetrics(request.getAdditionalMetrics())
                 .build();
         Activity savedActivity = activityRepository.save(activity);
@@ -35,7 +44,7 @@ public class ActivityService {
         response.setType(activity.getType());
         response.setDuration(activity.getDuration());
         response.setCaloriesBurned(activity.getCaloriesBurned());
-        response.setStarTime((activity.getStarTime()));
+        response.setStartTime(activity.getStartTime());
         response.setAdditionalMetrics(activity.getAdditionalMetrics());
         response.setCreatedAt(activity.getCreatedAt());
         response.setUpdatedAt(activity.getUpdatedAt());
@@ -51,6 +60,6 @@ public class ActivityService {
     public ActivityResponse getActivityById(String activityId){
         return activityRepository.findById(activityId)
                 .map(this::mapToResponse)
-                .orElseThrow(() -> new RuntimeException("Activity not Found with id: " + activityId));
+                .orElseThrow(() -> new ActivityNotFoundException("Activity not found with id: " + activityId));
     }
 }
