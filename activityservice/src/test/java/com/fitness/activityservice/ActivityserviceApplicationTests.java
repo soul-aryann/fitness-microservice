@@ -1,16 +1,78 @@
 package com.fitness.activityservice;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+
+import com.fitness.activityservice.exception.ActivityNotFoundException;
+import com.fitness.activityservice.service.ActivityService;
+
+import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
 		"eureka.client.enabled=false",
-		"spring.cloud.discovery.enabled=false"
+		"spring.cloud.discovery.enabled=false",
+		"OIDC_ISSUER_URI=https://issuer.example.test/",
+		"OIDC_JWKS_URI=https://issuer.example.test/jwks",
+		"OIDC_TOKEN_URI=https://issuer.example.test/token",
+		"ACTIVITY_API_AUDIENCE=activity-api",
+		"ACTIVITY_SERVICE_CLIENT_ID=activity-service-test",
+		"ACTIVITY_SERVICE_CLIENT_SECRET=test-secret",
+		"security.jwt.issuer-uri=https://issuer.example.test/",
+		"security.jwt.jwks-uri=https://issuer.example.test/jwks",
+		"security.jwt.audience=activity-api"
 })
+@AutoConfigureMockMvc
 class ActivityserviceApplicationTests {
+	@Autowired
+	private MockMvc mockMvc;
+
+	@MockitoBean
+	private ActivityService activityService;
 
 	@Test
 	void contextLoads() {
 	}
 
+	@Test
+	void activitiesRequireAuthentication() throws Exception {
+		mockMvc.perform(get("/api/activities").header("X-User-ID", "user-1"))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void activityListIsScopedToTokenSubject() throws Exception {
+		mockMvc.perform(get("/api/activities")
+					.header("X-User-ID", "user-2")
+					.with(jwt().jwt(token -> token.subject("user-1"))))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void authenticatedUserCanListOwnActivities() throws Exception {
+		given(activityService.getUserActivities("user-1")).willReturn(List.of());
+
+		mockMvc.perform(get("/api/activities")
+					.header("X-User-ID", "user-1")
+					.with(jwt().jwt(token -> token.subject("user-1"))))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	void activityDetailCannotConfirmAnotherUsersRecord() throws Exception {
+		given(activityService.getActivityById("activity-1", "user-1"))
+				.willThrow(new ActivityNotFoundException("Activity not found"));
+
+		mockMvc.perform(get("/api/activities/activity-1")
+					.with(jwt().jwt(token -> token.subject("user-1"))))
+				.andExpect(status().isNotFound());
+	}
 }

@@ -3,6 +3,11 @@ server:
 spring:
     application:
         name: user-service
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    issuer-uri: ${OIDC_ISSUER_URI}
     datasource:
         url: "${USER_DATABASE_URL:jdbc:postgresql://localhost:5432/fitness_user_db}"
         username: "${USER_DATABASE_USERNAME:postgres}"
@@ -19,3 +24,9 @@ eureka:
     client:
         service-url:
             defaultZone: http://localhost:8761/eureka/
+
+security:
+    jwt:
+        audience: ${USER_API_AUDIENCE}
+        issuer-uri: ${OIDC_ISSUER_URI}
+        jwks-uri: ${OIDC_JWKS_URI}

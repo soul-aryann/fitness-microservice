@@ -1,6 +1,22 @@
 spring:
   application:
     name: activity-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI}
+      client:
+        registration:
+          user-service-validation:
+            provider: fitness-oidc
+            client-id: ${ACTIVITY_SERVICE_CLIENT_ID}
+            client-secret: ${ACTIVITY_SERVICE_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+            scope: activity:validate
+        provider:
+          fitness-oidc:
+            token-uri: ${OIDC_TOKEN_URI}
 
   data:
     mongodb:
@@ -10,6 +26,12 @@ spring:
 
 server:
   port: 8082
+
+security:
+  jwt:
+    issuer-uri: ${OIDC_ISSUER_URI}
+    audience: ${ACTIVITY_API_AUDIENCE}
+    jwks-uri: ${OIDC_JWKS_URI}
 
 eureka:
     instance:

@@ -1,6 +1,9 @@
 package com.fitness.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +25,10 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/{userId}")
-    public ResponseEntity<UserResponse> getUserProfile(@PathVariable String userId){
+    public ResponseEntity<UserResponse> getUserProfile(@PathVariable String userId, @AuthenticationPrincipal Jwt jwt){
+        if (!userId.equals(jwt.getSubject())) {
+            throw new AccessDeniedException("Access denied");
+        }
         return ResponseEntity.ok(userService.getUserProfile(userId));
     }
 
