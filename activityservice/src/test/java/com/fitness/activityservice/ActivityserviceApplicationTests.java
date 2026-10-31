@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -83,6 +84,71 @@ class ActivityserviceApplicationTests {
 				.andExpect(jsonPath("$.userId").value("user-1"));
 
 		verify(activityService).trackActivity(any(), eq("user-1"));
+	}
+
+	@Test
+	void activityCreateRejectsMissingRequiredFieldsBeforeServiceCall() throws Exception {
+		mockMvc.perform(post("/api/activities")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{}")
+					.with(jwt().jwt(token -> token.subject("user-1"))))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+		verifyNoInteractions(activityService);
+	}
+
+	@Test
+	void activityCreateRejectsInvalidEnumBeforeServiceCall() throws Exception {
+		mockMvc.perform(post("/api/activities")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+						{"type":"FLYING","duration":30,"caloriesBurned":0,"startTime":"2026-10-31T10:00:00"}
+						""")
+					.with(jwt().jwt(token -> token.subject("user-1"))))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+		verifyNoInteractions(activityService);
+	}
+
+	@Test
+	void activityCreateRejectsDurationOutsideDocumentedRangeBeforeServiceCall() throws Exception {
+		String validRequestPrefix = "{\"type\":\"RUNNING\",\"caloriesBurned\":0,\"startTime\":\"2026-10-31T10:00:00\",\"duration\":";
+
+		for (int duration : List.of(-1, 0, 601)) {
+			mockMvc.perform(post("/api/activities")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(validRequestPrefix + duration + "}")
+						.with(jwt().jwt(token -> token.subject("user-1"))))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+		}
+
+		verifyNoInteractions(activityService);
+	}
+
+	@Test
+	void activityCreateRejectsOversizedOrUnknownMetricsBeforeServiceCall() throws Exception {
+		String oversizedNotes = "n".repeat(501);
+		String oversizedMetricsRequest = """
+				{"type":"RUNNING","duration":30,"caloriesBurned":0,"startTime":"2026-10-31T10:00:00","additionalMetrics":{"notes":"%s"}}
+				""".formatted(oversizedNotes);
+
+		for (String requestBody : List.of(
+				oversizedMetricsRequest,
+				"""
+				{"type":"RUNNING","duration":30,"caloriesBurned":0,"startTime":"2026-10-31T10:00:00","additionalMetrics":{"unsupported":true}}
+				""")) {
+			mockMvc.perform(post("/api/activities")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(requestBody)
+						.with(jwt().jwt(token -> token.subject("user-1"))))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+		}
+
+		verifyNoInteractions(activityService);
 	}
 
 	@Test
