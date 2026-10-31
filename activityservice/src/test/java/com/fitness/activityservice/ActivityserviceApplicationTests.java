@@ -4,18 +4,25 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
 import com.fitness.activityservice.exception.ActivityNotFoundException;
+import com.fitness.activityservice.dto.ActivityResponse;
 import com.fitness.activityservice.service.ActivityService;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SpringBootTest(properties = {
 		"eureka.client.enabled=false",
@@ -49,11 +56,33 @@ class ActivityserviceApplicationTests {
 	}
 
 	@Test
-	void activityListIsScopedToTokenSubject() throws Exception {
+	void activityListIgnoresSpoofedOwnerHeader() throws Exception {
+		given(activityService.getUserActivities("user-1")).willReturn(List.of());
+
 		mockMvc.perform(get("/api/activities")
 					.header("X-User-ID", "user-2")
 					.with(jwt().jwt(token -> token.subject("user-1"))))
-				.andExpect(status().isForbidden());
+				.andExpect(status().isOk());
+
+		verify(activityService).getUserActivities("user-1");
+	}
+
+	@Test
+	void activityCreateUsesTokenSubjectInsteadOfRequestOwner() throws Exception {
+		ActivityResponse response = new ActivityResponse();
+		response.setUserId("user-1");
+		given(activityService.trackActivity(any(), eq("user-1"))).willReturn(response);
+
+		mockMvc.perform(post("/api/activities")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+						{"userId":"user-2","type":"RUNNING","duration":30,"caloriesBurned":200,"startTime":"2026-10-31T10:00:00"}
+						""")
+					.with(jwt().jwt(token -> token.subject("user-1"))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.userId").value("user-1"));
+
+		verify(activityService).trackActivity(any(), eq("user-1"));
 	}
 
 	@Test
@@ -74,5 +103,7 @@ class ActivityserviceApplicationTests {
 		mockMvc.perform(get("/api/activities/activity-1")
 					.with(jwt().jwt(token -> token.subject("user-1"))))
 				.andExpect(status().isNotFound());
+
+		verify(activityService).getActivityById("activity-1", "user-1");
 	}
 }

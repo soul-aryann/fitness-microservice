@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -40,7 +41,6 @@ class ActivityServiceTest {
     @Test
     void trackActivity_Success() {
         ActivityRequest request = new ActivityRequest();
-        request.setUserId("user-1");
         request.setType(ActivityType.RUNNING);
         request.setDuration(30);
         request.setCaloriesBurned(300);
@@ -59,23 +59,24 @@ class ActivityServiceTest {
 
         when(activityRepository.save(any(Activity.class))).thenReturn(savedActivity);
 
-        ActivityResponse response = activityService.trackActivity(request);
+        ActivityResponse response = activityService.trackActivity(request, "user-1");
 
         assertNotNull(response);
         assertEquals("act-1", response.getId());
         assertEquals("user-1", response.getUserId());
         assertEquals(ActivityType.RUNNING, response.getType());
-        verify(activityRepository).save(any(Activity.class));
+        ArgumentCaptor<Activity> savedActivityCaptor = ArgumentCaptor.forClass(Activity.class);
+        verify(activityRepository).save(savedActivityCaptor.capture());
+        assertEquals("user-1", savedActivityCaptor.getValue().getUserId());
     }
 
     @Test
     void trackActivity_InvalidUser() {
         ActivityRequest request = new ActivityRequest();
-        request.setUserId("invalid-user");
 
         when(userValidationService.validateUser("invalid-user")).thenReturn(false);
 
-        assertThrows(UserValidationException.class, () -> activityService.trackActivity(request));
+        assertThrows(UserValidationException.class, () -> activityService.trackActivity(request, "invalid-user"));
     }
 
     @Test
@@ -95,25 +96,25 @@ class ActivityServiceTest {
     }
 
     @Test
-    void getActivityById_Success() {
+    void getActivityById_SuccessForOwner() {
         Activity activity = Activity.builder()
                 .id("act-1")
                 .userId("user-1")
                 .type(ActivityType.CYCLING)
                 .build();
 
-        when(activityRepository.findById("act-1")).thenReturn(Optional.of(activity));
+        when(activityRepository.findByIdAndUserId("act-1", "user-1")).thenReturn(Optional.of(activity));
 
-        ActivityResponse response = activityService.getActivityById("act-1");
+        ActivityResponse response = activityService.getActivityById("act-1", "user-1");
 
         assertNotNull(response);
         assertEquals("act-1", response.getId());
     }
 
     @Test
-    void getActivityById_NotFound() {
-        when(activityRepository.findById("non-existent")).thenReturn(Optional.empty());
+    void getActivityById_NotFoundForNonOwnerOrMissingActivity() {
+        when(activityRepository.findByIdAndUserId("activity-1", "user-1")).thenReturn(Optional.empty());
 
-        assertThrows(ActivityNotFoundException.class, () -> activityService.getActivityById("non-existent"));
+        assertThrows(ActivityNotFoundException.class, () -> activityService.getActivityById("activity-1", "user-1"));
     }
 }

@@ -19,15 +19,15 @@ import lombok.RequiredArgsConstructor;
 public class ActivityService {
     private final ActivityRepository activityRepository;
     private final UserValidationService userValidationService;
-    public ActivityResponse trackActivity(ActivityRequest request){
+    public ActivityResponse trackActivity(ActivityRequest request, String authenticatedUserId){
 
-       boolean isValidUser = userValidationService.validateUser(request.getUserId());
+       boolean isValidUser = userValidationService.validateUser(authenticatedUserId);
        if(!isValidUser){
-        throw new UserValidationException("Invalid user: " + request.getUserId());
+        throw new UserValidationException("Invalid user: " + authenticatedUserId);
        }
 
         Activity activity = Activity.builder()
-                .userId(request.getUserId())
+                .userId(authenticatedUserId)
                 .type(request.getType())
                 .duration(request.getDuration())
                 .caloriesBurned(request.getCaloriesBurned())
@@ -57,12 +57,6 @@ public class ActivityService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
-    public ActivityResponse getActivityById(String activityId){
-        return activityRepository.findById(activityId)
-                .map(this::mapToResponse)
-                .orElseThrow(() -> new ActivityNotFoundException("Activity not found with id: " + activityId));
-    }
-
     public ActivityResponse getActivityById(String activityId, String userId){
         return activityRepository.findByIdAndUserId(activityId, userId)
                 .map(this::mapToResponse)

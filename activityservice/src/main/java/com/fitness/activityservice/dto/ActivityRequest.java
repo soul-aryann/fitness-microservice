@@ -5,16 +5,12 @@ import java.util.Map;
 
 import com.fitness.activityservice.model.ActivityType;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 @Data
 public class ActivityRequest {
-    @NotBlank(message = "User ID is required")
-    private String userId;
-
     @NotNull(message = "Activity type is required")
     private ActivityType type;
 
