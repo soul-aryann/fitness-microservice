@@ -11,7 +11,10 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -39,7 +42,7 @@ class UserServiceTest {
     private UserService userService;
 
     @Test
-    void register_Success() {
+    void register_HashesPasswordAndDoesNotReturnIt() throws JsonProcessingException {
         RegisterRequest request = new RegisterRequest();
         request.setEmail("test@example.com");
         request.setPassword("password123");
@@ -65,7 +68,12 @@ class UserServiceTest {
         assertEquals("user-123", response.getId());
         assertEquals("test@example.com", response.getEmail());
         assertEquals(UserRole.USER, response.getRole());
-        verify(userRepository).save(any(User.class));
+        ArgumentCaptor<User> savedUserCaptor = ArgumentCaptor.forClass(User.class);
+        verify(passwordEncoder).encode("password123");
+        verify(userRepository).save(savedUserCaptor.capture());
+        assertEquals("encodedPassword", savedUserCaptor.getValue().getPassword());
+        assertFalse(new ObjectMapper().findAndRegisterModules()
+                .writeValueAsString(response).contains("\"password\""));
     }
 
     @Test
@@ -79,10 +87,11 @@ class UserServiceTest {
     }
 
     @Test
-    void getUserProfile_Success() {
+    void getUserProfile_DoesNotReturnStoredPassword() throws JsonProcessingException {
         User user = new User();
         user.setId("user-123");
         user.setEmail("test@example.com");
+        user.setPassword("$2a$12$storedHash");
         user.setRole(UserRole.USER);
 
         when(userRepository.findById("user-123")).thenReturn(Optional.of(user));
@@ -92,6 +101,8 @@ class UserServiceTest {
         assertNotNull(response);
         assertEquals("user-123", response.getId());
         assertEquals(UserRole.USER, response.getRole());
+        assertFalse(new ObjectMapper().findAndRegisterModules()
+                .writeValueAsString(response).contains("\"password\""));
     }
 
     @Test
